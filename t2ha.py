@@ -4,6 +4,20 @@ import pandas as pd
 import json 
 import os
 from datetime import date
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from datetime import datetime
+
+SPREADSHEET_ID = '1QgiTl4XhDOKkbhQZJvwi9ZKsbw5z1YcFoj3QEeUOetw'
+SERVICE_ACCOUNT_FILE = 'credentials.json'
+
+credentials = Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE,
+    scopes=['https://www.googleapis.com/auth/spreadsheets']
+)
+service = build('sheets', 'v4', credentials=credentials)
+
+
 
 pd.set_option('display.max_rows', None)        # or set a large number if you want to limit it
 pd.set_option('display.max_columns', None)     # or set a large number if you want to limit it
@@ -45,7 +59,7 @@ def function_to_save_data( df_new, db_folder_old ,db_folder_new, task_to_dbpath)
         database_path = os.path.join(db_folder_old, dbfile)
         conn = sqlite3.connect(database_path)
         df = pd.read_sql_query(f"SELECT * FROM TaskAction WHERE raw_text_id = '{raw_text_id}';", conn)
-        if len(df)!=1 and taskname == "idx2MetricScore: Trait Score":
+        if len(df)!=1 and taskname == "idx2MetricScore_TraitScore":
             database_path = os.path.join(db_folder_old, task_to_dbpath["idx2Sentence"])
             conn = sqlite3.connect(database_path)
             df = pd.read_sql_query(f"SELECT * FROM TaskAction WHERE raw_text_id = '{raw_text_id}';", conn)
@@ -63,12 +77,26 @@ def function_to_save_data( df_new, db_folder_old ,db_folder_new, task_to_dbpath)
             row["result"] = new_res_string
             row["annotator_id"] = annotator_name+row["raw_text_id"]
             row["annotator_name"] = annotator_name
+            utc_now = datetime.utcnow()
+            row['time_of_annotation'] = utc_now.strftime('%Y-%m-%d %H:%M:%S')
+            print("row is")
+            row = [[x for x in row.values()]]
             print(row)
-            new_df = pd.DataFrame([row], index = [0])
-            database_path = os.path.join(db_folder_new, dbfile)
-            conn = sqlite3.connect(database_path)
-            new_df.to_sql('TaskAction', conn, index=False, if_exists='append')
-            conn.close()
+            request = service.spreadsheets().values().append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=taskname,
+                valueInputOption='RAW',
+                insertDataOption='INSERT_ROWS',
+                body={'values': row}
+            )
+            response = request.execute()
+            print(response)
+
+            # new_df = pd.DataFrame([row], index = [0])
+            # database_path = os.path.join(db_folder_new, dbfile)
+            # conn = sqlite3.connect(database_path)
+            # new_df.to_sql('TaskAction', conn, index=False, if_exists='append')
+            # conn.close()
 
 def function_to_empty_db(checkbox_states, df, db_folder_new, task_to_dbpath):
     if st.button('Submit'):
@@ -122,8 +150,8 @@ def display_dataframe_with_checkboxes(df):
 task_to_dbpath = {
     'idx2Sentence': 'idx2Sentence_nltk.db',
     'idx2HumanDetect': 'idx2HumanDetect_gpt-3o5-turbo-1106Tem0.db',
-    'idx2TraitDetect: tender-mindedness': 'idx2TraitDetect_tender-mindedness_gpt-3o5-turbo-1106Tem0.db', 
-    'idx2MetricScore: Trait Score': 'idx2MetricScore_tender-mindedness_Trait Score_gpt-3o5-turbo-1106Tem0.db',
+    'idx2TraitDetect_tender_mindedness': 'idx2TraitDetect_tender-mindedness_gpt-3o5-turbo-1106Tem0.db', 
+    'idx2MetricScore_TraitScore': 'idx2MetricScore_tender-mindedness_Trait Score_gpt-3o5-turbo-1106Tem0.db',
 }            
 
 # db_folder = '/Users/ynadell/Desktop/CDHAI/CDHAI-LLM/Text2Survey/2-DATA_DB/2-ReviewBucket1000/Group_s1000000_e1009999_SH_Physician/rs42_chunk_1_Task/'
@@ -137,7 +165,7 @@ st.write('The raw_text_id is', raw_text_id)
 
 df = function_to_query_data(raw_text_id, task_to_dbpath, db_folder)
 #removing metric score from display 
-df.pop("idx2MetricScore: Trait Score")
+df.pop("idx2MetricScore_TraitScore")
 checkbox_states = display_dataframe_with_checkboxes(df)
 metric_score = st.text_input('Metric Score')
 
@@ -170,7 +198,7 @@ if st.button('Submit'):
                 st.write(f"Checkbox for {column_name} in row {row_index} is now {df[column_name].iloc[row_index]}")
             
         #the below line is to copy the metric score assigned by the annotator to all the sentences in the dataframe
-        df['idx2MetricScore: Trait Score'] = [f"{metric_score}" for _ in range(len(df['idx2Sentence']))]
+        df['idx2MetricScore_TraitScore'] = [f"{metric_score}" for _ in range(len(df['idx2Sentence']))]
         print("function to save df is triggered")
 
         function_to_save_data(df, db_folder ,db_folder_new, task_to_dbpath)
