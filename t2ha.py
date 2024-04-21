@@ -32,7 +32,6 @@ def function_to_save_data(df, sent_selction_columns, data_frame, index, SentList
     titles = [sheet['properties']['title'] for sheet in sheets]
     for metric in sent_selction_columns_copy:
         df_columns = data_frame.columns.tolist()
-        #fix set shuffle
         common_columns_set = set(df_columns) - (set(sent_selction_columns_copy))
         common_columns = []
         for col in df_columns:
@@ -45,13 +44,10 @@ def function_to_save_data(df, sent_selction_columns, data_frame, index, SentList
         row["annotator_name"] = annotator_name
         utc_now = datetime.utcnow()
         row['time_of_annotation'] = utc_now.strftime('%Y-%m-%d %H:%M:%S')
-        st.write(metric)
-        # st.write(type(metric))
         if metric=='metric_score':
             row[metric] = metric_score
         else:
             row[metric] = " && ".join(list(df[metric]))
-        st.write(row.keys())
         if metric not in titles:
             body = {
                 "requests": [{
@@ -73,7 +69,6 @@ def function_to_save_data(df, sent_selction_columns, data_frame, index, SentList
             )
             response = request.execute()
         row = [[x for x in row.values()]]
-        st.write(row)
         request = service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
             range=metric,
@@ -150,8 +145,6 @@ if __name__ == "__main__":
 
     st.title("Annotation Site")
     data_frame = pd.read_pickle("new_llm_data.pkl")
-    st.write(list(data_frame.columns))
-    
 
     annotator_name = st.text_input('Annotator Name')
     TEXT_ID = st.text_input('TEXT_ID', 'ReviewID')
