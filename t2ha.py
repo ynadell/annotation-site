@@ -1,8 +1,5 @@
 import streamlit as st
-import sqlite3
-import pandas as pd 
-import json 
-import os
+import pandas as pd
 from datetime import date
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -23,10 +20,9 @@ pd.set_option('display.max_rows', None)        # or set a large number if you wa
 pd.set_option('display.max_columns', None)     # or set a large number if you want to limit it
 pd.set_option('display.max_colwidth', None)    # to display full content of each cell without truncation
 
-def function_to_save_data(df, sent_selction_columns, data_frame, index, SentListColumn, metric_score):
-    #NEW TABLE TO WRITE METRIC SCORE
+def function_to_save_data(df, sent_selction_columns, sent_score_columns,data_frame, index, SentListColumn):
     sent_selction_columns_copy = sent_selction_columns.copy()
-    sent_selction_columns_copy.append(("metric_score"))
+    sent_selction_columns_copy += sent_score_columns
     sheet_metadata = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     sheets = sheet_metadata.get('sheets', '')
     titles = [sheet['properties']['title'] for sheet in sheets]
@@ -40,14 +36,17 @@ def function_to_save_data(df, sent_selction_columns, data_frame, index, SentList
         row = data_frame[list(common_columns)].iloc[index]
         row = row.to_dict()
         row[SentListColumn] = " && ".join(list(row[SentListColumn]))
-        row["annotator_id"] = annotator_name + str(index)
+        row["annotation_id"] = annotator_name + str(index)#ADD review ID
         row["annotator_name"] = annotator_name
         utc_now = datetime.utcnow()
         row['time_of_annotation'] = utc_now.strftime('%Y-%m-%d %H:%M:%S')
-        if metric=='metric_score':
+        st.write(metric)
+        # st.write(type(metric))
+        if metric =='metric_score':
             row[metric] = metric_score
         else:
             row[metric] = " && ".join(list(df[metric]))
+        st.write(row.keys())
         if metric not in titles:
             body = {
                 "requests": [{
@@ -69,6 +68,7 @@ def function_to_save_data(df, sent_selction_columns, data_frame, index, SentList
             )
             response = request.execute()
         row = [[x for x in row.values()]]
+        st.write(row)
         request = service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
             range=metric,
@@ -144,15 +144,22 @@ def function_to_query_data(data_frame,
 if __name__ == "__main__":
 
     st.title("Annotation Site")
-    data_frame = pd.read_pickle("new_llm_data.pkl")
-
+    
+    uploaded_file = st.file_uploader("Choose a file", type=['pkl'])
+    if uploaded_file is None:
+        st.error("Please upload an pickle file")
+    else:
+        data_frame = pd.read_pickle(uploaded_file)
+        st.write(list(data_frame.columns))
     annotator_name = st.text_input('Annotator Name')
-    TEXT_ID = st.text_input('TEXT_ID', 'ReviewID')
+    TEXT_ID = st.text_input('TEXT_ID', 'ReviewID') # This is the column name for the ReviewID
     index = int(st.text_input('index', '0'))
     
     SentListColumn = st.text_input('SentListColumn', 'Review-Tnltk')
     sent_selection_columns = st.text_input('sent_selection_columns', 'Review-Tnltk.HphyG4, Review-Tnltk.HphyG4.AopenG4')
+    sent_score_columns = st.text_input('sent_selection_columns', 'metric_score')
     sent_selection_columns = sent_selection_columns.split(', ')
+    sent_score_columns = sent_score_columns.split(', ')
     
     text_id_value = data_frame.iloc[index][TEXT_ID]
     st.write('The text_id_value is', text_id_value)
@@ -206,7 +213,7 @@ if __name__ == "__main__":
         print("function to save df is triggered")
         st.write(df)
         # df.to_csv('xxxx')
-        function_to_save_data(df, sent_selection_columns, data_frame, index, SentListColumn, metric_score)
+        function_to_save_data(df, sent_selection_columns,sent_score_columns, data_frame, index, SentListColumn)
 
 
         d = {}
