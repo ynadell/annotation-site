@@ -20,7 +20,7 @@ pd.set_option('display.max_rows', None)        # or set a large number if you wa
 pd.set_option('display.max_columns', None)     # or set a large number if you want to limit it
 pd.set_option('display.max_colwidth', None)    # to display full content of each cell without truncation
 
-def function_to_save_data(df, sent_selction_columns, sent_score_columns,data_frame, index, SentListColumn):
+def function_to_save_data(df, sent_selction_columns, sent_score_columns,data_frame, index, SentListColumn, text_id_value):
     sent_selction_columns_copy = sent_selction_columns.copy()
     sent_selction_columns_copy += sent_score_columns
     sheet_metadata = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
@@ -36,7 +36,7 @@ def function_to_save_data(df, sent_selction_columns, sent_score_columns,data_fra
         row = data_frame[list(common_columns)].iloc[index]
         row = row.to_dict()
         row[SentListColumn] = " && ".join(list(row[SentListColumn]))
-        row["annotation_id"] = annotator_name + str(index)#ADD review ID
+        row["annotation_id"] = annotator_name + str(text_id_value)
         row["annotator_name"] = annotator_name
         utc_now = datetime.utcnow()
         row['time_of_annotation'] = utc_now.strftime('%Y-%m-%d %H:%M:%S')
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         print("function to save df is triggered")
         st.write(df)
         # df.to_csv('xxxx')
-        function_to_save_data(df, sent_selection_columns,sent_score_columns, data_frame, index, SentListColumn)
+        function_to_save_data(df, sent_selection_columns,sent_score_columns, data_frame, index, SentListColumn, text_id_value)
 
 
         d = {}
